@@ -1,9 +1,9 @@
 {
     "PluginFileVersion" : 1,
 	
-	"FriendlyName" : "BrickGrid",
+	"FriendlyName" : "Bricks",
 	"Version" : 1,
-	"VersionName" : "1.0",
+	"VersionName" : "0.1",
 	"CreatedBy" : "Andrew Scheidecker",
 	"CreatedByURL" : "http://www.scheidecker.net",
 	"MinEngineVersion" : 1579795,
@@ -15,7 +15,7 @@
 		{
 			"Name" : "BrickGrid",
 			"Type" : "Runtime",
-			"BlacklistPlatforms" : [ "HTML5" ]
+			"BlacklistPlatforms" : [  ]
 		}
 	]
 }

@@ -1,7 +1,7 @@
 // Copyright 2014, Andrew Scheidecker. All Rights Reserved. 
 
-#include "BrickGridPluginPrivatePCH.h"
 #include "BrickCollisionComponent.h"
+#include "BrickGridPluginPrivatePCH.h"
 #include "BrickGridComponent.h"
 #include "PhysicsEngine/BodySetup.h"
 
@@ -94,7 +94,7 @@ void UBrickCollisionComponent::UpdateCollisionBody()
 
 						// Physics bodies are uniformly scaled by the minimum component of the 3D scale.
 						// Compute the non-uniform scaling components to apply to the box center/extent.
-						const FVector AbsScale3D = ComponentToWorld.GetScale3D().GetAbs();
+						const FVector AbsScale3D = GetComponentTransform().GetScale3D().GetAbs();
 						const FVector NonUniformScale3D = AbsScale3D / AbsScale3D.GetMin();
 
 						// Set the box center and size.

@@ -54,8 +54,10 @@ struct FBrick
 	FBrick(int32 InMaterialIndex) : MaterialIndex(InMaterialIndex) {}
 };
 
+
+
 /** A 3D integer vector. */
-USTRUCT(BlueprintType,Atomic)
+USTRUCT(BlueprintType)
 struct FInt3
 {
 	GENERATED_USTRUCT_BODY()
@@ -146,7 +148,7 @@ struct FInt3
 };
 
 /** A region of the brick grid. */
-USTRUCT()
+USTRUCT(BlueprintType)
 struct FBrickRegion
 {
 	GENERATED_USTRUCT_BODY()

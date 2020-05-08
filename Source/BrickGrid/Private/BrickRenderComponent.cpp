@@ -77,6 +77,11 @@ public:
 class FBrickChunkIndexBuffer : public FIndexBuffer 
 {
 public:
+
+	FBrickChunkIndexBuffer() {
+
+	}
+
 	TArray<uint16> Indices;
 	virtual void InitRHI()
 	{
@@ -122,13 +127,19 @@ class FBrickChunkVertexFactory : public FLocalVertexFactory
 {
 public:
 
+	FBrickChunkVertexFactory()
+		:
+		FLocalVertexFactory( ERHIFeatureLevel::SM5, "BrickChunk")
+	{}
+
 	void Init(const FBrickChunkVertexBuffer& VertexBuffer,const FPrimitiveSceneProxy* InPrimitiveSceneProxy,uint8 InFaceIndex)
 	{
 		PrimitiveSceneProxy = InPrimitiveSceneProxy;
 		FaceIndex = InFaceIndex;
 
+
 		// Initialize the vertex factory's stream components.
-		DataType NewData;
+		FDataType NewData;
 		NewData.PositionComponent = STRUCTMEMBER_VERTEXSTREAMCOMPONENT(&VertexBuffer, FBrickVertex, X, VET_UByte4N);
 		NewData.TextureCoordinates.Add(STRUCTMEMBER_VERTEXSTREAMCOMPONENT(&VertexBuffer, FBrickVertex, X, VET_UByte4N));
 		NewData.ColorComponent = STRUCTMEMBER_VERTEXSTREAMCOMPONENT(&VertexBuffer, FBrickVertex, X, VET_Color);
@@ -139,12 +150,13 @@ public:
 		ENQUEUE_UNIQUE_RENDER_COMMAND_TWOPARAMETER(
 			InitBrickChunkVertexFactory,
 			FBrickChunkVertexFactory*,VertexFactory,this,
-			DataType,NewData,NewData,
+			FDataType,NewData,NewData,
 		{
 			VertexFactory->SetData(NewData);
 		});
 	}
 
+	/*
 	virtual uint64 GetStaticBatchElementVisibility(const class FSceneView& View, const struct FMeshBatch* Batch) const override
 	{
 		return IsStaticBatchVisible(View.ViewMatrices.GetViewOrigin(),Batch) ? 1 : 0;
@@ -153,7 +165,7 @@ public:
 	{
 		return IsStaticBatchVisible(LightSceneProxy->GetPosition(),Batch) ? 1 : 0;
 	}
-
+	*/
 private:
 
 	const FPrimitiveSceneProxy* PrimitiveSceneProxy;
@@ -205,16 +217,23 @@ public:
 	TArray<uint8> LocalBrickMaterials;
 
 	FBrickChunkSceneProxy(UBrickRenderComponent* Component,const TArray<uint8>&& InLocalBrickMaterials)
-	: FPrimitiveSceneProxy(Component)
-	, LocalBrickMaterials(InLocalBrickMaterials)
+		:
+		FPrimitiveSceneProxy(Component),
+		LocalBrickMaterials(InLocalBrickMaterials)
 	{}
+
+	SIZE_T FPrimitiveSceneProxy::GetTypeHash() const
+	{
+		return 17 * 719;
+	}
+
 
 	void BeginInitResources()
 	{
 		// Enqueue initialization of render resource
 		ENQUEUE_UNIQUE_RENDER_COMMAND_ONEPARAMETER(SetupCompletionFence,FGraphEventRef,SetupCompletionEvent,SetupCompletionEvent,
 		{
-			FTaskGraphInterface::Get().WaitUntilTaskCompletes(SetupCompletionEvent,ENamedThreads::RenderThread);
+			FTaskGraphInterface::Get().WaitUntilTaskCompletes(SetupCompletionEvent,ENamedThreads::ActualRenderingThread);
 		});
 		BeginInitResource(&VertexBuffer);
 		BeginInitResource(&IndexBuffer);
@@ -238,14 +257,15 @@ public:
 	virtual void OnTransformChanged() override
 	{
 		// Create a uniform buffer with the transform for the chunk.
-		PrimitiveUniformBuffer = CreatePrimitiveUniformBufferImmediate(FScaleMatrix(FVector(255, 255, 255)) * GetLocalToWorld(), GetBounds(), GetLocalBounds(), true, UseEditorDepthTest());
+		// PORT 4.24 UseEditorDepthTest()
+		PrimitiveUniformBuffer = CreatePrimitiveUniformBufferImmediate(FScaleMatrix(FVector(255, 255, 255)) * GetLocalToWorld(), GetBounds(), GetLocalBounds(), GetBounds(), true, false );
 	}
 
 	virtual void GetDynamicMeshElements(const TArray<const FSceneView*>& Views,const FSceneViewFamily& ViewFamily,uint32 VisibilityMap,class FMeshElementCollector& Collector) const override
 	{
 		// Set up the wireframe material Face.
 		auto WireframeMaterialFace = new FColoredMaterialRenderProxy(
-			WITH_EDITOR ? GEngine->WireframeMaterial->GetRenderProxy(IsSelected()) : NULL,
+			WITH_EDITOR ? GEngine->WireframeMaterial->GetRenderProxy() : NULL,
 			FLinearColor(0, 0.5f, 1.f)
 			);
 		Collector.RegisterOneFrameMaterialProxy(WireframeMaterialFace);
@@ -300,7 +320,7 @@ public:
 		const FElement& Element = Elements[ElementIndex];
 		OutBatch.bWireframe = WireframeMaterialFace != NULL;
 		OutBatch.VertexFactory = &VertexFactories[Element.FaceIndex];
-		OutBatch.MaterialRenderProxy = WireframeMaterialFace ? WireframeMaterialFace : Materials[Element.MaterialIndex]->GetRenderProxy(IsSelected());
+		OutBatch.MaterialRenderProxy = WireframeMaterialFace ? WireframeMaterialFace : Materials[Element.MaterialIndex]->GetRenderProxy();
 		OutBatch.ReverseCulling = IsLocalToWorldDeterminantNegative();
 		OutBatch.Type = PT_TriangleList;
 		OutBatch.DepthPriorityGroup = SDPG_World;
@@ -406,11 +426,11 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 
 			// Compute the ambient occlusion for the vertices in this chunk.
 			const FInt3 LocalVertexDim = Grid->BricksPerRenderChunk + FInt3::Scalar(1);
-			#if !WITH_GFSDK_VXGI
+			//#if !WITH_GFSDK_VXGI
 				TArray<uint8> LocalVertexAmbientFactors;
 				LocalVertexAmbientFactors.SetNumUninitialized(LocalVertexDim.X * LocalVertexDim.Y * LocalVertexDim.Z);
 				ComputeChunkAO(Grid,MinLocalBrickCoordinates,LocalBrickExpansion,LocalBricksDim,LocalVertexDim,LocalBrickMaterials,LocalVertexAmbientFactors);
-			#endif
+			//#endif
 
 			// Create an array of the vertices needed to render this chunk, along with a map from 3D coordinates to indices.
 			TArray<uint16> VertexIndexMap;
@@ -440,11 +460,11 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 							VertexIndexMap.Add(BrickSceneProxy->VertexBuffer.Vertices.Num());
 							new(BrickSceneProxy->VertexBuffer.Vertices) FBrickVertex(
 								LocalVertexCoordinates,
-								#if WITH_GFSDK_VXGI
-									255
-								#else
+								//#if WITH_GFSDK_VXGI
+								//	255
+								//#else
 									LocalVertexAmbientFactors[(LocalVertexCoordinates.Y * LocalVertexDim.X + LocalVertexCoordinates.X) * LocalVertexDim.Z + LocalVertexCoordinates.Z]
-								#endif
+								//#endif
 								);
 						}
 						else
